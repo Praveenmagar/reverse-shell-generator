@@ -18,7 +18,7 @@ A menu-driven, multi-encoder reverse shell payload generator for penetration tes
 
 1. **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/reverse-shell-generator.git
+    git clone https://github.com/Praveenmagar/reverse-shell-generator.git
     cd reverse-shell-generator
     ```
 
