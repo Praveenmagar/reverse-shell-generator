@@ -34,13 +34,7 @@ A menu-driven, multi-encoder reverse shell payload generator for penetration tes
 
 ---
 
-## Usage
-
-**Interactive:**
-```bash
-python generator.py
-
-# Installation on Linux
+** Installation on Linux **
 # 1. Clone the repository
 git clone https://github.com/Praveenmagar/reverse-shell-generator.git
 
@@ -55,3 +49,10 @@ python3 generator.py
 
 # 5. Or, run with command-line arguments (example)
 python3 generator.py --ip 10.10.10.10 --port 4444 --payload python --encoder xor --output shell.py
+## Usage
+
+**Interactive:**
+```bash
+python generator.py
+
+
