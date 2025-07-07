@@ -1,0 +1,12 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Output files/folders
+output/
+
+# Environment files (if any)
+.env
+
+# VSCode project settings (optional, remove if not used)
+.vscode/
