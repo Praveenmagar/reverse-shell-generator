@@ -4,7 +4,10 @@ A menu-driven, multi-encoder reverse shell payload generator for penetration tes
 
 ---
 
-![Reverse Shell Generator Banner](images/reverse.png)
+<p align="center">
+  <img src="images/reverse.png" alt="Reverse Shell Generator Banner" width="600"/>
+</p>
+
 
 ## Features
 
