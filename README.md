@@ -4,6 +4,8 @@ A menu-driven, multi-encoder reverse shell payload generator for penetration tes
 
 ---
 
+![Reverse Shell Generator Banner](images/reverse.png)
+
 ## Features
 
 - Generate reverse shells for **Python, Bash, PHP**
