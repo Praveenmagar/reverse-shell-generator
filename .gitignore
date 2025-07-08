@@ -3,7 +3,8 @@ __pycache__/
 *.pyc
 
 # Output files/folders
-output/
+output/*
+!output/.gitkeep
 
 # Environment files (if any)
 .env

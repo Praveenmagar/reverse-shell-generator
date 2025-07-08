@@ -31,6 +31,9 @@ A menu-driven, multi-encoder reverse shell payload generator for penetration tes
     ```bash
     pip install colorama
     ```
+    ```bash
+    pip install qrcode[pil]
+    ```
 
 ---
 
@@ -61,5 +64,13 @@ python3 generator.py --ip 10.10.10.10 --port 4444 --payload python --encoder xor
 **Interactive:**
 ```bash
 python generator.py
+```
 
+### Serve Payloads via HTTP
+
+After generating your payload, you can serve it for easy download:
+
+```bash
+python host_payload.py
+```
 
