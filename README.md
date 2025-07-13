@@ -34,7 +34,12 @@ A menu-driven, multi-encoder reverse shell payload generator for penetration tes
     ```bash
     pip install qrcode[pil]
     ```
-
+    ```bash
+    pip install python-whois ipwhois
+    ```
+    ```bash
+    pip install tabulate
+    ```
 ---
 
 ## Installation on Linux 
@@ -57,6 +62,11 @@ python3 generator.py
 5. Or, run with command-line arguments (example)
 ```bash
 python3 generator.py --ip 10.10.10.10 --port 4444 --payload python --encoder xor --output shell.py
+```
+
+* For graphical user interface install this first
+```bash
+    sudo apt-get install python3-tk 
 ```
 
 ## Usage
