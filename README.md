@@ -39,6 +39,15 @@ A menu-driven, multi-encoder reverse shell payload generator for penetration tes
     ```
     ```bash
     pip install tabulate
+    ``` 
+    ```bash
+    pip install requests
+    ```
+    ```bash
+    pip install reportlab
+    ```
+    ```bash
+    pip install secure-smtplib
     ```
 ---
 

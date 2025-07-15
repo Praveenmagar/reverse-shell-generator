@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Menu-driven Reverse-Shell Generator
-Adds optional encoding (Base64, Hex, ROT13, XOR) and obfuscation for Bash, Python, and PHP payloads.
+Menu-driven Reverse-Shell Generator & WHOIS Lookup Utility
 Authorised use only!
 """
 
@@ -15,16 +14,13 @@ from host_payload import serve_directory
 from colorama import init, Fore, Style
 from utils.input_validation import get_lhost, get_lport, is_valid_ip, is_valid_hostname, is_valid_port
 from utils.vt_report import upload_file_to_virustotal, get_vt_report
-
-# --- WHOIS IMPORTS ---
 from utils.whois_utils import (
-    is_valid_ip as whois_valid_ip,
-    is_valid_domain,
     whois_domain,
     whois_ip,
     generate_whois_html,
-    prompt_for_domains_or_ips  # <-- NEW import
+    prompt_for_domains_or_ips
 )
+from utils.email_report import send_report_via_email
 
 init(autoreset=True)
 
@@ -59,54 +55,35 @@ def save_payload(code: str, filename: str) -> None:
 
 def whois_lookup_menu():
     print(Fore.CYAN + "\n=== WHOIS Lookup Utility ===" + Style.RESET_ALL)
-    # --- Use robust input/validation from whois_utils.py ---
-    valid_domains, valid_ips = prompt_for_domains_or_ips()  # <--- RECOMMENDED!
+    valid_domains, valid_ips = prompt_for_domains_or_ips()
 
     domain_results = [whois_domain(d) for d in valid_domains]
     ip_results = [whois_ip(ip) for ip in valid_ips]
 
-    # Terminal pretty print (optional, using tabulate if you wish)
+    # Pretty print for user (optional)
     try:
         from tabulate import tabulate
         if domain_results:
             print(Fore.CYAN + "\n[Domain WHOIS Results]" + Style.RESET_ALL)
-            domain_table = []
+            headers = list(domain_results[0].keys())
+            table = []
             for r in domain_results:
-                if "error" in r:
-                    domain_table.append([r['domain'], "ERROR: " + r['error'], "", "", "", "", ""])
-                else:
-                    domain_table.append([
-                        r.get('domain',''),
-                        r.get('registrar',''),
-                        r.get('org',''),
-                        r.get('country',''),
-                        r.get('creation_date',''),
-                        r.get('expiration_date',''),
-                        r.get('emails','')
-                    ])
-            headers = ["Domain", "Registrar", "Org", "Country", "Creation", "Expiry", "Email"]
-            print(tabulate(domain_table, headers=headers, tablefmt="fancy_grid"))
+                row = [r.get(h, "") for h in headers]
+                table.append(row)
+            print(tabulate(table, headers=headers, tablefmt="fancy_grid"))
 
         if ip_results:
             print(Fore.CYAN + "\n[IP WHOIS Results]" + Style.RESET_ALL)
-            ip_table = []
+            headers = list(ip_results[0].keys())
+            table = []
             for r in ip_results:
-                if "error" in r:
-                    ip_table.append([r['ip'], "ERROR: " + r['error'], "", "", ""])
-                else:
-                    ip_table.append([
-                        r.get('ip',''),
-                        r.get('asn',''),
-                        r.get('org',''),
-                        r.get('country',''),
-                        r.get('cidr','')
-                    ])
-            headers = ["IP", "ASN", "Org", "Country", "CIDR"]
-            print(tabulate(ip_table, headers=headers, tablefmt="fancy_grid"))
+                row = [r.get(h, "") for h in headers]
+                table.append(row)
+            print(tabulate(table, headers=headers, tablefmt="fancy_grid"))
     except ImportError:
         print(Fore.YELLOW + "Tip: Install tabulate for pretty terminal tables: pip install tabulate" + Style.RESET_ALL)
 
-    # ---- Ask user for filename before saving ----
+    # Save HTML file
     default_name = "whois_lookup.html"
     custom_name = input(Fore.YELLOW + f"Enter filename to save WHOIS HTML report (default: {default_name}): " + Style.RESET_ALL).strip()
     output_filename = custom_name if custom_name else default_name
@@ -119,10 +96,44 @@ def whois_lookup_menu():
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(html_snippet)
     print(Fore.GREEN + f"\n[+] WHOIS HTML report saved: {output_file}\nOpen it in your browser!" + Style.RESET_ALL)
+    print(Fore.YELLOW + "[*] You can export CSV or PDF directly from the browser via the download buttons at the top of the HTML report." + Style.RESET_ALL)
+
+    # --- Email Option (HTML or PDF) ---
+    send_mail = input(Fore.CYAN + "\nDo you want to send this WHOIS report via email? (y/n): " + Style.RESET_ALL).strip().lower()
+    if send_mail == "y":
+        print(Fore.CYAN + "\nWhat file do you want to email?")
+        print(Fore.CYAN + "  1. The HTML report (generated just now)")
+        print(Fore.CYAN + "  2. The PDF report (exported/downloaded from browser)")
+        file_choice = input(Fore.YELLOW + "Enter choice (1/2): " + Style.RESET_ALL).strip()
+
+        if file_choice == "2":
+            pdf_path = input(Fore.YELLOW + "Enter the full path to the PDF report (downloaded from browser): " + Style.RESET_ALL).strip()
+            if not os.path.isfile(pdf_path):
+                print(Fore.RED + "[-] PDF file not found! Email not sent." + Style.RESET_ALL)
+                return
+            attach_path = pdf_path
+            attach_name = os.path.basename(pdf_path)
+            mime_hint = "PDF"
+        else:
+            attach_path = output_file
+            attach_name = os.path.basename(output_file)
+            mime_hint = "HTML"
+
+        to_email = input(Fore.YELLOW + f"Enter recipient email address: " + Style.RESET_ALL).strip()
+        subject = f"WHOIS Lookup Report ({mime_hint})"
+        body = f"Dear User,\n\nPlease find the attached WHOIS Lookup {mime_hint} report.\n\nReport: {attach_name}\n\nRegards,\nReverse-Shell Generator"
+
+        try:
+            ok = send_report_via_email(to_email, subject, body, attach_path)
+            if ok:
+                print(Fore.GREEN + "[+] Email sent successfully." + Style.RESET_ALL)
+            else:
+                print(Fore.RED + "[-] Email could not be sent. Check your SMTP configuration." + Style.RESET_ALL)
+        except Exception as e:
+            print(Fore.RED + f"[-] Failed to send email: {e}" + Style.RESET_ALL)
 
 def main():
     print_banner()
-    # --- Main Menu ---
     print(Fore.CYAN + "\nSelect option:")
     print(Fore.CYAN + " 1. Generate reverse shell payload")
     print(Fore.CYAN + " 2. WHOIS Lookup utility")
@@ -132,7 +143,7 @@ def main():
         whois_lookup_menu()
         return
 
-    # --- Option 1: Generate payload (existing logic) ---
+    # --- Option 1: Generate payload ---
     parser = argparse.ArgumentParser(
         description="Reverse-shell generator with encoding and obfuscation options."
     )
@@ -143,14 +154,11 @@ def main():
     parser.add_argument("--output", help="Output filename")
     args = parser.parse_args()
 
-    # === INPUT VALIDATION ADDED HERE ===
-    # Validate LHOST
     if args.ip and (is_valid_ip(args.ip) or is_valid_hostname(args.ip)):
         ip = args.ip
     else:
         ip = get_lhost()
 
-    # Validate LPORT
     if args.port and is_valid_port(args.port):
         port = args.port
     else:
@@ -193,7 +201,6 @@ def main():
             return
         final_code = encoder_fn(raw_code)
     else:
-        # Interactive encoder selection
         print(Fore.CYAN + "\nSelect encoder or obfuscator:")
         print(Fore.CYAN + " 1. None")
         print(Fore.CYAN + " 2. Base64")
@@ -226,11 +233,9 @@ def main():
             print(Fore.RED + "[-] Encoder not supported for this payload type.")
             return
 
-    # Output filename
     fname = args.output or input(Fore.YELLOW + f"Save as (default: {default_name}{enc_ext}): " + Style.RESET_ALL).strip() or (default_name + enc_ext)
     save_payload(final_code, fname)
 
-    # === Print summary and VirusTotal scan integration starts here ===
     print(Fore.MAGENTA + Style.BRIGHT + "\n=== PAYLOAD SUMMARY ===" + Style.RESET_ALL)
     print(Fore.CYAN + f"Type      : {lang}")
     print(Fore.CYAN + f"Encoder   : {args.encoder if args.encoder else 'interactive'}")
@@ -238,7 +243,6 @@ def main():
     print(Fore.CYAN + f"LPORT     : {port}")
     print(Fore.CYAN + f"File      : {fname}")
 
-    # Offer to scan with VirusTotal
     scan = input("Do you want to check this payload's AV detection rate on VirusTotal? (y/n): ").strip().lower()
     if scan == "y":
         api_key = input("Enter your VirusTotal API key: ").strip()
@@ -247,7 +251,6 @@ def main():
         if file_id:
             get_vt_report(file_id, api_key, file_path=file_path)
 
-    # Offer to host the payload via HTTP (using imported function)
     host = input(Fore.YELLOW + "\nDo you want to host the payload in the 'output' folder via HTTP? (y/n): " + Style.RESET_ALL).strip().lower()
     if host == "y":
         port_input = input(Fore.YELLOW + "Enter port to use for hosting (default 8080): " + Style.RESET_ALL).strip()
